@@ -1,0 +1,184 @@
+/* Globals - Smoother, larger fonts */
+* {
+    font-family: "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px; /* Increased base font size */
+}
+
+QWidget {
+    background-color: #1e1e1e;
+    color: #cccccc;
+}
+
+/* Main Window and Docks */
+QMainWindow::separator {
+    background: #333333;
+    width: 2px;
+    height: 2px;
+}
+
+QDockWidget {
+    border: 1px solid #333333;
+}
+
+QDockWidget::title {
+    background: #252526;
+    padding: 8px 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: #999999;
+}
+
+/* Top Menu Bar */
+QMenuBar {
+    background-color: #1e1e1e;
+    padding: 4px;
+    border-bottom: 1px solid #333333;
+}
+
+QMenuBar::item {
+    background: transparent;
+    padding: 6px 12px; /* Larger menu items */
+    border-radius: 4px; /* Smooth corners */
+}
+
+QMenuBar::item:selected {
+    background: #333333;
+}
+
+/* Dropdown Menus (File, Edit, etc.) */
+QMenu {
+    background-color: #252526;
+    border: 1px solid #3c3c3c;
+    border-radius: 6px;
+    padding: 6px 0px; /* Padding top/bottom of menu */
+}
+
+QMenu::item {
+    padding: 8px 32px 8px 24px; /* Larger hit-box for drop down items */
+    font-size: 14px;
+}
+
+QMenu::item:selected {
+    background-color: #007acc; /* VS Code Blue */
+    color: white;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #3c3c3c;
+    margin: 4px 12px;
+}
+
+/* Top ToolBar */
+QToolBar {
+    background-color: #252526;
+    border: none;
+    border-bottom: 1px solid #333333;
+    padding: 6px;
+}
+
+/* Larger ComboBoxes (Dropdowns) */
+QComboBox {
+    background-color: #3c3c3c;
+    border: 1px solid #555555;
+    border-radius: 4px; /* Smoother corners */
+    padding: 6px 12px;  /* Larger padding */
+    min-width: 150px;
+}
+
+QComboBox:hover {
+    border: 1px solid #007acc;
+}
+
+QComboBox::drop-down {
+    border: none;
+    padding-right: 8px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #252526;
+    border: 1px solid #3c3c3c;
+    selection-background-color: #007acc;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+/* Standard Buttons */
+QPushButton {
+    background-color: #007acc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 18px; /* Slightly larger buttons */
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #0098ff;
+}
+
+/* Tab Widget (Central Pane) */
+QTabWidget::pane {
+    border: 1px solid #333333;
+    border-top: none;
+    background: #1e1e1e;
+}
+
+QTabBar::tab {
+    background: #2d2d2d;
+    color: #999999;
+    padding: 10px 20px;
+    border: 1px solid #333333;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin-right: 2px;
+    font-size: 13px;
+}
+
+QTabBar::tab:selected {
+    background: #1e1e1e;
+    color: #ffffff;
+    border-top: 2px solid #007acc;
+}
+
+QTabBar::tab:hover:!selected {
+    background: #333333;
+}
+
+/* Tree View (Project Explorer Sidebar) */
+QTreeView {
+    background-color: #252526;
+    border: none;
+    outline: none;
+    padding-top: 8px;
+}
+
+QTreeView::item {
+    padding: 4px; /* Spreads out the tree hierarchy */
+    border-radius: 3px;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+QTreeView::item:hover {
+    background-color: #2a2d2e;
+}
+
+QTreeView::item:selected {
+    background-color: #04395e;
+    color: #ffffff;
+}
+
+/* Status Bar */
+QStatusBar {
+    background-color: #007acc;
+    color: #ffffff;
+}
+
+QStatusBar QLabel {
+    color: #ffffff;
+    padding: 0px 10px;
+    font-weight: 600;
+}
