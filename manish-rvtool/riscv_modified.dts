@@ -1,0 +1,83 @@
+/dts-v1/;
+
+/{
+	#address-cells = <2>;
+  	#size-cells = <2>;
+  	compatible = "ucbbar,spike-bare-dev";
+ 	model = "ucbbar,spike-bare";
+
+  	cpus {
+    		#address-cells = <1>;
+    		#size-cells = <0>;
+    		timebase-frequency =<18750>;
+    		
+    		CPU0: cpu@0 {
+      			device_type = "cpu";
+      			reg = <0>;
+      			status = "okay";
+     		 	compatible = "riscv";
+      			riscv,isa = "rv64imafdc";
+      			mmu-type = "riscv,sv39";
+      			clock-frequency =<75000000>;
+      			
+      			CPU0_intc: interrupt-controller {
+        			#interrupt-cells = <1>;
+        			interrupt-controller;
+        			compatible = "riscv,cpu-intc";
+      			};
+    		};
+  	};
+  	
+  	memory@80000000 {
+    		device_type = "memory";
+    		reg = <0x0 0x80000000 0x0 0x20000000>;
+  	};
+
+  	soc {
+    		#address-cells = <2>;
+    		#size-cells = <2>;
+    		compatible = "ucbbar,spike-bare-soc", "simple-bus";
+    		ranges;
+    		
+    	plic0: interrupt-controller@20010000 {
+			#interrupt-cells = <1>;
+			compatible = "cdac,plic-1.0.0";
+			reg = <0x0 0x20010000 0x0 0x4000000>;
+			riscv,ndev = <66>;
+			interrupt-controller;
+			interrupts-extended = <&CPU0_intc 9>;
+  		};
+
+		clint@20010000 {
+      			compatible = "riscv,clint0";
+      			interrupts-extended = <&CPU0_intc 3 &CPU0_intc 7>;
+      			reg = <0x0 0x20010000 0x0 0xc0000>;
+    		};
+  
+  		uart@10000100 {
+     			compatible = "cdac,uart0"; 
+     			reg = <0x0 0x10000100 0x0 0x100>;
+  		};
+  		ethernet@20030000 {
+     			device_type = "network";
+     			compatible = "cdac,cdac_gmac"; 
+     			phy-mode = "gmii";
+     			platform = "profpga_duo";
+     			interrupt-parent = <&plic0>;
+     			interrupts = <63>;
+     			reg = <0x0 0x20030000 0x0 0x100>;
+  		};
+	};
+
+	// Moved reserved-memory inside the root node
+	reserved-memory {
+	    #address-cells = <2>;
+	    #size-cells = <2>;
+	    ranges;
+
+	    mmode_resv0: mmode_resv0@80000000 {
+	        reg = <0x00000000 0x80000000 0x00000000 0x00200000>;
+	        no-map;
+	    };
+	};
+};

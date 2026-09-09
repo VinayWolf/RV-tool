@@ -2,65 +2,24 @@ import sys
 import os
 import shutil
 import re
+
+# Ensure backend and ui imports resolve cleanly regardless of invocation path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QDockWidget, QTreeView, QTabWidget, QTextEdit, QMenuBar, QMenu,
-    QToolBar, QStatusBar, QLabel, QPushButton, QSpacerItem,
-    QSizePolicy, QFileDialog, QDialog, QCheckBox, QDialogButtonBox,
-    QMessageBox, QLineEdit, QGroupBox, QInputDialog, QStackedWidget,
-    QAbstractItemView
+    QFileDialog, QDialog, QCheckBox, QDialogButtonBox,
+    QMessageBox, QLineEdit, QGroupBox, QInputDialog, QLabel, QPushButton
 )
-from PyQt6.QtCore import Qt, QSize, QSettings
-from PyQt6.QtGui import QAction, QFont, QFileSystemModel
+from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt, QSettings
 
-# --- DTS PARSER LOGIC ---
-def parse_dts_file(filepath):
-    data = {
-        "model": "Unknown", "isa": "Unknown", "mmu": "Unknown",
-        "memory_base": "Unknown", "peripherals": []
-    }
-    
-    if not filepath or not os.path.exists(filepath): return data
+from ui.statusbar import MainStatusBar
+from ui.console import ConsoleDock
+from ui.toolbar import MainToolBar
+from ui.project_tree import ProjectExplorerDock
+from ui.editor import CentralWorkspace
 
-    try:
-        with open(filepath, 'r') as f: content = f.read()
-        model_m = re.search(r'model\s*=\s*"([^"]+)"', content)
-        if model_m: data["model"] = model_m.group(1)
-        isa_m = re.search(r'riscv,isa\s*=\s*"([^"]+)"', content)
-        if isa_m: data["isa"] = isa_m.group(1)
-        mmu_m = re.search(r'mmu-type\s*=\s*"([^"]+)"', content)
-        if mmu_m: data["mmu"] = mmu_m.group(1)
-
-        for match in re.finditer(r'([a-zA-Z0-9_-]+)@([0-9a-fA-F]+)\s*\{', content):
-            node_name = match.group(1)
-            node_addr = match.group(2)
-            start_idx = match.end()
-
-            brace_count = 1
-            idx = start_idx
-            while idx < len(content) and brace_count > 0:
-                if content[idx] == '{': brace_count += 1
-                elif content[idx] == '}': brace_count -= 1
-                idx += 1
-
-            block = content[start_idx:idx-1]
-            if node_name == "memory":
-                data["memory_base"] = "0x" + node_addr
-            elif node_name != "cpu": 
-                comp_m = re.search(r'compatible\s*=\s*"([^"]+)"', block)
-                if comp_m:
-                    data["peripherals"].append({
-                        "name": node_name,
-                        "addr": "0x" + node_addr.upper(),
-                        "compatible": comp_m.group(1)
-                    })
-    except Exception as e:
-        print(f"Parser error: {e}")
-        
-    data["peripherals"] = sorted(data["peripherals"], key=lambda x: int(x["addr"], 16))
-    return data
-
-# --- UI LOGIC ---
 class NewProjectDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -154,11 +113,29 @@ class RISCVBuilderIDE(QMainWindow):
         self.settings = QSettings("AMI", "RISCV_Builder")
 
         self.setup_menu_bar()
-        self.setup_top_toolbar()
-        self.setup_left_sidebar()
-        self.setup_central_workspace()
-        self.setup_bottom_console()
-        self.setup_status_bar()
+        
+        # ToolBar Component
+        self.top_toolbar = MainToolBar(self)
+        self.top_toolbar.run_requested.connect(self.mock_boot_action)
+        self.top_toolbar.stop_requested.connect(self.mock_stop_action)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.top_toolbar)
+
+        # Sidebar Component
+        self.project_dock = ProjectExplorerDock(self)
+        self.project_dock.file_double_clicked.connect(self.on_file_double_clicked)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.project_dock)
+
+        # Central Editor Workspace
+        self.workspace = CentralWorkspace(self)
+        self.setCentralWidget(self.workspace)
+
+        # Bottom Terminal Console
+        self.console_dock = ConsoleDock(self)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.console_dock)
+
+        # Status Bar Component
+        self.status_bar = MainStatusBar(self)
+        self.setStatusBar(self.status_bar)
         
         self.update_recent_menu()
 
@@ -208,132 +185,6 @@ class RISCVBuilderIDE(QMainWindow):
         about_action.triggered.connect(self.action_about_us)
         about_menu.addAction(about_action)
 
-    def setup_top_toolbar(self):
-        self.top_toolbar = QToolBar("Main Toolbar")
-        self.top_toolbar.setObjectName("topToolBar")
-        self.top_toolbar.setMovable(False)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.top_toolbar)
-        
-        self.btn_play = QPushButton("▶ Run")
-        self.btn_play.setObjectName("runBtn")
-        self.btn_play.setStyleSheet("background-color: #2ea043; color: white; border: none; border-radius: 4px; padding: 8px 18px; font-weight: bold;")
-        self.btn_play.clicked.connect(self.mock_boot_action)
-        self.top_toolbar.addWidget(self.btn_play)
-        
-        self.btn_stop = QPushButton("⏹ Stop")
-        self.btn_stop.setStyleSheet("background-color: #d73a49; color: white; border: none; border-radius: 4px; padding: 8px 18px; font-weight: bold;")
-        self.btn_stop.clicked.connect(self.mock_stop_action)
-        self.top_toolbar.addWidget(self.btn_stop)
-
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.top_toolbar.addWidget(spacer)
-
-    def setup_left_sidebar(self):
-        self.sidebar_dock = QDockWidget("Project Explorer", self)
-        self.sidebar_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
-        
-        self.sidebar_stack = QStackedWidget()
-        
-        # --- Index 0: Blank State ---
-        self.lbl_no_project = QLabel("No active project.")
-        self.lbl_no_project.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_no_project.setStyleSheet("color: #777777;")
-        self.sidebar_stack.addWidget(self.lbl_no_project)
-        
-        # --- Index 1: VS Code Style Explorer Widget ---
-        explorer_widget = QWidget()
-        explorer_layout = QVBoxLayout(explorer_widget)
-        explorer_layout.setContentsMargins(0, 0, 0, 0)
-        explorer_layout.setSpacing(0)
-        
-        # The VS Code style "Root Project Header" label
-        self.project_header_lbl = QLabel("PROJECT")
-        self.project_header_lbl.setStyleSheet("font-weight: bold; padding: 8px 10px; background-color: #2a2d2e; color: #cccccc; font-size: 11px; letter-spacing: 1px;")
-        
-        # Standard File System Model
-        self.file_model = QFileSystemModel()
-        
-        self.tree_view = QTreeView()
-        self.tree_view.setModel(self.file_model)
-        self.tree_view.setHeaderHidden(True)
-        self.tree_view.setAnimated(True)
-        self.tree_view.setIndentation(20)
-        
-        # Disable focus rectangle & select full row
-        self.tree_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tree_view.setAllColumnsShowFocus(True)
-        self.tree_view.setStyleSheet("QTreeView { outline: none; border: none; } QTreeView::item { outline: none; }")
-        
-        for col in range(1, 4):
-            self.tree_view.hideColumn(col)
-            
-        self.tree_view.doubleClicked.connect(self.on_file_double_clicked)
-        
-        explorer_layout.addWidget(self.project_header_lbl)
-        explorer_layout.addWidget(self.tree_view)
-        
-        self.sidebar_stack.addWidget(explorer_widget)
-        
-        self.sidebar_dock.setWidget(self.sidebar_stack)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.sidebar_dock)
-
-    def setup_central_workspace(self):
-        self.central_stack = QStackedWidget()
-        
-        self.lbl_no_file = QLabel("Create or Load a project to begin.")
-        self.lbl_no_file.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_no_file.setStyleSheet("color: #555555; font-size: 16px; font-weight: bold;")
-        self.central_stack.addWidget(self.lbl_no_file)
-        
-        self.tabs = QTabWidget()
-        self.hw_tab = QTextEdit()
-        self.hw_tab.setReadOnly(True)
-        self.code_tab = QTextEdit()
-        self.code_tab.setStyleSheet("font-family: 'Consolas', 'Courier New', monospace; font-size: 14px; background: #1e1e1e; color: #d4d4d4;")
-        self.tabs.addTab(self.hw_tab, "Hardware Map")
-        self.tabs.addTab(self.code_tab, "Editor")
-        
-        self.central_stack.addWidget(self.tabs)
-        self.setCentralWidget(self.central_stack)
-
-    def setup_bottom_console(self):
-        self.console_dock = QDockWidget("Integrated Terminal", self)
-        console_widget = QWidget()
-        layout = QVBoxLayout(console_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        console_toolbar = QHBoxLayout()
-        clear_btn = QPushButton("Clear")
-        clear_btn.setStyleSheet("background-color: #333; color: #ccc; border-radius: 4px; padding: 4px 12px;")
-        clear_btn.clicked.connect(lambda: self.console_output.clear())
-        console_toolbar.addStretch()
-        console_toolbar.addWidget(clear_btn)
-        
-        self.console_output = QTextEdit()
-        self.console_output.setObjectName("consolePane")
-        self.console_output.setReadOnly(True)
-        self.console_output.setStyleSheet("font-family: 'Consolas', monospace; font-size: 13px; background-color: #181818;")
-        
-        layout.addLayout(console_toolbar)
-        layout.addWidget(self.console_output)
-        
-        self.console_dock.setWidget(console_widget)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.console_dock)
-
-    def setup_status_bar(self):
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-        
-        self.project_status = QLabel(" Project: None ")
-        self.workflow_status = QLabel(" Configs: None ")
-        self.emu_status = QLabel(" Emulator: IDLE ")
-        
-        self.status_bar.addPermanentWidget(self.project_status)
-        self.status_bar.addPermanentWidget(self.workflow_status)
-        self.status_bar.addPermanentWidget(self.emu_status)
-
     def update_recent_menu(self):
         self.recent_menu.clear()
         recent_files = self.settings.value("recent_projects", [])
@@ -377,64 +228,8 @@ class RISCVBuilderIDE(QMainWindow):
         self.settings.setValue("recent_projects", [])
         self.update_recent_menu()
 
-    def log_to_console(self, module, message, level="info"):
-        colors = {"info": "#4facf7", "warn": "#d7ba7d", "error": "#f44747", "emu": "#4caf50"}
-        color = colors.get(level, "#ffffff")
-        html_msg = f"<span style='color: {color}; font-weight: bold;'>[{module}]</span> <span style='color: #cccccc;'>{message}</span>"
-        self.console_output.append(html_msg)
-        self.console_output.verticalScrollBar().setValue(self.console_output.verticalScrollBar().maximum())
-
-    def update_hardware_map_ui(self):
-        if not self.current_dts_file or not os.path.exists(os.path.join(self.current_project_path, self.current_dts_file)):
-            self.hw_tab.setHtml("<h2 style='color: #4facf7; font-family: sans-serif;'>Hardware Map</h2><p>No valid DTS file imported.</p>")
-            return
-
-        dts_full_path = os.path.join(self.current_project_path, self.current_dts_file)
-        parsed_data = parse_dts_file(dts_full_path)
-
-        html = f"""
-        <div style="font-family: 'Segoe UI', sans-serif; color: #d4d4d4;">
-            <h2 style="color: #4facf7; border-bottom: 1px solid #333; padding-bottom: 5px;">Hardware Configuration Map</h2>
-            
-            <h3 style="color: #d7ba7d; margin-top: 15px;">System Core</h3>
-            <table style="border-collapse: collapse; width: 60%; font-size: 14px;">
-                <tr><td style="padding: 8px; border: 1px solid #444; background-color: #252526; font-weight: bold; width: 40%;">Machine Model</td><td style="padding: 8px; border: 1px solid #444;">{parsed_data['model']}</td></tr>
-                <tr><td style="padding: 8px; border: 1px solid #444; background-color: #252526; font-weight: bold;">Instruction Set (ISA)</td><td style="padding: 8px; border: 1px solid #444;">{parsed_data['isa']}</td></tr>
-                <tr><td style="padding: 8px; border: 1px solid #444; background-color: #252526; font-weight: bold;">MMU Type</td><td style="padding: 8px; border: 1px solid #444;">{parsed_data['mmu']}</td></tr>
-                <tr><td style="padding: 8px; border: 1px solid #444; background-color: #252526; font-weight: bold;">Main Memory Base</td><td style="padding: 8px; border: 1px solid #444; font-family: monospace; color: #4caf50;">{parsed_data['memory_base']}</td></tr>
-            </table>
-
-            <h3 style="color: #d7ba7d; margin-top: 25px;">Memory Mapped Peripherals</h3>
-            <table style="border-collapse: collapse; width: 90%; font-size: 14px;">
-                <tr>
-                    <th style="padding: 8px; border: 1px solid #444; background-color: #252526; text-align: left;">Base Address</th>
-                    <th style="padding: 8px; border: 1px solid #444; background-color: #252526; text-align: left;">Device Node</th>
-                    <th style="padding: 8px; border: 1px solid #444; background-color: #252526; text-align: left;">Compatible Driver</th>
-                </tr>
-        """
-        for p in parsed_data["peripherals"]:
-            html += f"""
-                <tr>
-                    <td style="padding: 6px 8px; border: 1px solid #444; font-family: monospace; color: #4caf50;">{p['addr']}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #444;">{p['name']}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #444; font-style: italic;">{p['compatible']}</td>
-                </tr>
-            """
-        html += "</table></div>"
-        self.hw_tab.setHtml(html)
-
-    def on_file_double_clicked(self, index):
-        file_path = self.file_model.filePath(index)
-        
-        if os.path.isfile(file_path):
-            if file_path.endswith(".dts") or file_path.endswith(".c") or file_path.endswith(".S") or file_path.endswith(".ld") or file_path.endswith(".toml"):
-                self.central_stack.setCurrentIndex(1)
-                self.tabs.setCurrentIndex(1) 
-                try:
-                    with open(file_path, "r") as f:
-                        self.code_tab.setPlainText(f.read())
-                except Exception as e:
-                    pass
+    def on_file_double_clicked(self, file_path):
+        self.workspace.open_file(file_path)
 
     def write_toml_config(self, project_path, p_name, dts_file, configs):
         toml_path = os.path.join(project_path, "riscv_env.toml")
@@ -452,26 +247,16 @@ class RISCVBuilderIDE(QMainWindow):
         self.current_dts_file = dts_file
         self.current_configs = configs
         
-        # Window Title & Menu Update
         self.setWindowTitle(f"{self.base_title} - {self.current_project_name}")
         self.close_action.setEnabled(True)
         self.save_action.setEnabled(True)
         self.save_as_action.setEnabled(True)
 
-        # File Explorer Root & Header Update
-        self.project_header_lbl.setText(f"▾ {self.current_project_name.upper()}")
-        self.file_model.setRootPath(self.current_project_path)
-        self.tree_view.setRootIndex(self.file_model.index(self.current_project_path))
-
-        # Show workspace
-        self.sidebar_stack.setCurrentIndex(1)
-        self.central_stack.setCurrentIndex(1)
-        self.tabs.setCurrentIndex(0) 
+        self.project_dock.load_project_folder(self.current_project_path, self.current_project_name)
+        self.workspace.show_workspace()
+        self.workspace.update_hardware_map(self.current_project_path, self.current_dts_file)
         
-        self.update_hardware_map_ui()
-        
-        self.project_status.setText(f" Project: {p_name} ")
-        self.workflow_status.setText(f" Configs: {len(configs)} active ")
+        self.status_bar.update_status(p_name, len(configs), "IDLE")
 
     def action_new_project(self):
         dialog = NewProjectDialog(self)
@@ -508,7 +293,7 @@ class RISCVBuilderIDE(QMainWindow):
                 toml_path = self.write_toml_config(full_project_path, p_name, copied_dts_path, configs)
                 self.add_to_recent(toml_path)
                 self.load_workspace(full_project_path, p_name, copied_dts_path, configs)
-            except Exception as e:
+            except Exception:
                 pass
 
     def action_load_project(self):
@@ -534,7 +319,7 @@ class RISCVBuilderIDE(QMainWindow):
             
             self.load_workspace(project_dir, p_name, dts_file, configs)
             self.add_to_recent(file_name)
-        except Exception as e:
+        except Exception:
             pass
 
     def action_close_project(self):
@@ -549,11 +334,9 @@ class RISCVBuilderIDE(QMainWindow):
         self.save_action.setEnabled(False)
         self.save_as_action.setEnabled(False)
 
-        self.sidebar_stack.setCurrentIndex(0)
-        self.central_stack.setCurrentIndex(0)
-        
-        self.project_status.setText(" Project: None ")
-        self.workflow_status.setText(" Configs: None ")
+        self.project_dock.set_empty_state()
+        self.workspace.set_empty_state()
+        self.status_bar.update_status()
 
     def action_save_project(self):
         if self.current_project_path:
@@ -572,7 +355,7 @@ class RISCVBuilderIDE(QMainWindow):
                     toml_path = self.write_toml_config(new_project_path, new_name, self.current_dts_file, self.current_configs)
                     self.add_to_recent(toml_path)
                     self.load_workspace(new_project_path, new_name, self.current_dts_file, self.current_configs)
-                except Exception as e:
+                except Exception:
                     pass
 
     def action_about_us(self):
@@ -580,7 +363,7 @@ class RISCVBuilderIDE(QMainWindow):
 
     def mock_boot_action(self):
         if not self.current_project_path: return
-        self.log_to_console("Toolchain", "Starting cross-compilation process...", "warn")
+        self.console_dock.log_to_console("Toolchain", "Starting cross-compilation process...", "warn")
 
     def mock_stop_action(self):
         pass

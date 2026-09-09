@@ -1,7 +1,7 @@
 /* Globals - Smoother, larger fonts */
 * {
     font-family: "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
-    font-size: 14px; /* Increased base font size */
+    font-size: 14px;
 }
 
 QWidget {
@@ -38,29 +38,29 @@ QMenuBar {
 
 QMenuBar::item {
     background: transparent;
-    padding: 6px 12px; /* Larger menu items */
-    border-radius: 4px; /* Smooth corners */
+    padding: 6px 12px;
+    border-radius: 4px;
 }
 
 QMenuBar::item:selected {
     background: #333333;
 }
 
-/* Dropdown Menus (File, Edit, etc.) */
+/* Dropdown Menus */
 QMenu {
     background-color: #252526;
     border: 1px solid #3c3c3c;
     border-radius: 6px;
-    padding: 6px 0px; /* Padding top/bottom of menu */
+    padding: 6px 0px;
 }
 
 QMenu::item {
-    padding: 8px 32px 8px 24px; /* Larger hit-box for drop down items */
+    padding: 8px 32px 8px 24px;
     font-size: 14px;
 }
 
 QMenu::item:selected {
-    background-color: #007acc; /* VS Code Blue */
+    background-color: #007acc;
     color: white;
 }
 
@@ -78,12 +78,12 @@ QToolBar {
     padding: 6px;
 }
 
-/* Larger ComboBoxes (Dropdowns) */
+/* Larger ComboBoxes */
 QComboBox {
     background-color: #3c3c3c;
     border: 1px solid #555555;
-    border-radius: 4px; /* Smoother corners */
-    padding: 6px 12px;  /* Larger padding */
+    border-radius: 4px;
+    padding: 6px 12px;
     min-width: 150px;
 }
 
@@ -110,7 +110,7 @@ QPushButton {
     color: white;
     border: none;
     border-radius: 4px;
-    padding: 8px 18px; /* Slightly larger buttons */
+    padding: 8px 18px;
     font-weight: 600;
 }
 
@@ -147,7 +147,7 @@ QTabBar::tab:hover:!selected {
     background: #333333;
 }
 
-/* Tree View (Project Explorer Sidebar) */
+/* Tree View */
 QTreeView {
     background-color: #252526;
     border: none;
@@ -156,7 +156,7 @@ QTreeView {
 }
 
 QTreeView::item {
-    padding: 4px; /* Spreads out the tree hierarchy */
+    padding: 4px;
     border-radius: 3px;
     margin-left: 4px;
     margin-right: 4px;

@@ -1,0 +1,9 @@
+[project]
+name = "manish-rvtool"
+dts_file = "riscv_modified.dts"
+
+[configs]
+toolchain = true
+bare_metal = false
+rtos = false
+emulation = false
